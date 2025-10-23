@@ -61,7 +61,7 @@ def send_numbered_list(chat_id, items, title="Items", per_page=50):
 def fetch_jwt_token(account):
     uid, password = account.get("uid"), account.get("password")
     if not uid or not password: return None
-    url = f"https://jwttoken-ten.vercel.app/token?uid={uid}&password={password}"
+    url = f"https://jwt-yunus.vercel.app/token?uid={uid}&password={password}"
     try:
         response = requests.get(url, timeout=10)
         if response.status_code == 200 and (token := response.json().get("token")):
