@@ -61,7 +61,7 @@ def send_numbered_list(chat_id, items, title="Items", per_page=50):
 def fetch_jwt_token(account):
     uid, password = account.get("uid"), account.get("password")
     if not uid or not password: return None
-    url = f"https://jwt-yunus-new.vercel.app/token?uid={uid}&password={pasword}"
+    url = f"https://jwt-yunus-new.vercel.app/token?uid={uid}&password={password}"
     try:
         response = requests.get(url, timeout=10)
         if response.status_code == 200 and (token := response.json().get("token")):
@@ -291,18 +291,44 @@ def handle_document(message):
         
         total = len(accounts)
         tokens_list = []
+        success_count = 0
+        fail_count = 0
+        
         with ThreadPoolExecutor(max_workers=20) as executor:
             futures = [executor.submit(fetch_jwt_token, acc) for acc in accounts]
             for i, future in enumerate(as_completed(futures), 1):
-                if result := future.result(): tokens_list.append(result)
+                result = future.result()
+                if result:
+                    tokens_list.append(result)
+                    success_count += 1
+                else:
+                    fail_count += 1
+                
                 if i % 5 == 0 or i == total:
-                    try: bot.edit_message_text(f"⏳ Processed {i}/{total} accounts...", chat_id, msg.message_id)
+                    status_text = (
+                        f"⏳ *Processing JWTs...*\n\n"
+                        f"📊 Progress: {i}/{total}\n"
+                        f"✅ Success: {success_count}\n"
+                        f"❌ Failed: {fail_count}\n"
+                        f"📈 Success Rate: {(success_count/i*100):.1f}%"
+                    )
+                    try: bot.edit_message_text(status_text, chat_id, msg.message_id)
                     except telebot.apihelper.ApiTelegramException: pass
         
         output_filename = f"jwts_{chat_id}.json"
         with open(output_filename, "w") as f: json.dump(tokens_list, f, indent=4)
-        bot.edit_message_text(f"✅ Complete! Found {len(tokens_list)} valid JWTs.", chat_id, msg.message_id)
-        with open(output_filename, "rb") as f: bot.send_document(chat_id, f, caption="Here are your JWT tokens!")
+        
+        final_text = (
+            f"✅ *Generation Complete!*\n\n"
+            f"📊 Total Accounts: {total}\n"
+            f"✅ Successful: {success_count}\n"
+            f"❌ Failed: {fail_count}\n"
+            f"📈 Success Rate: {(success_count/total*100):.1f}%"
+        )
+        bot.edit_message_text(final_text, chat_id, msg.message_id)
+        
+        with open(output_filename, "rb") as f: 
+            bot.send_document(chat_id, f, caption=f"🎉 Here are your {success_count} JWT tokens!")
         os.remove(output_filename)
         sess['step'] = None
         return
